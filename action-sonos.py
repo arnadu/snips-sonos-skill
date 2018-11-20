@@ -25,7 +25,7 @@ def dump():
 def music_handler_resume(hermes,intentMessage):
 	try:
 		#dump()
-
+		hermes.publish_end_session(intentMessage.session_id, "")
 		#if the Snips intent has a value for the device_name slot, start only the designated player
 	        if len(intentMessage.slots.device_name)>0:
         	        device_name = intentMessage.slots.device_name[0].slot_value.value.value
@@ -48,13 +48,22 @@ def music_handler_resume(hermes,intentMessage):
         	        except:
                 	        print sys.exc_info()
 
-		#else set the devices in party mode and play everywhere
+		#else start in party mode
 		else:
 			try:
-				print "start in party mode"
-				device = soco.discovery.any_soco()
-				device.partymode()
-				device.play()
+				print "playing all devices in party mode"
+				#dump()
+				zones = soco.discover()
+				for z in zones:
+					try:
+						if (z.is_coordinator):
+							print "set party mode from zone:" + z.player_name
+							z.partymode()
+							z.play()
+							break
+					except:
+						print sys.exc_info()
+
 			except:
 				print sys.exc_info()
 	except:
@@ -62,6 +71,8 @@ def music_handler_resume(hermes,intentMessage):
 
 def music_handler_pause(hermes,intentMessage):
 	#dump()
+
+	hermes.publish_end_session(intentMessage.session_id, "")
 
 	#stop designated device(s) if there is something in the device_name slot
 	if len(intentMessage.slots.device_name)>0:
@@ -85,22 +96,30 @@ def music_handler_pause(hermes,intentMessage):
 		print 'pause all devices'
 	        for zone in zones:
 			try:
-				zone.pause()
+				if (zone.is_coordinator):
+					zone.pause()
 			except:
 				print sys.exc_info()
 
 def music_handler_volume_up(hermes,intentMessage):
+	hermes.publish_end_session(intentMessage.session_id, "")
 	for zone in zones:
 		try:
 			if len(intentMessage.slots.volume_higher)>0:
 				volume = intentMessage.slots.volume_higher.first().value
 			else:
 				volume = 5
+
+			#prevent accidental increasing of volume by a large number
+			if (volume>20):
+				volume = 20
+
 			zone.volume += volume
 		except:
 			print sys.exc_info()
 
 def music_handler_volume_down(hermes,intentMessage):
+	hermes.publish_end_session(intentMessage.session_id, "")
 	for zone in zones:
 		try:
                         if len(intentMessage.slots.volume_lower)>0:
@@ -112,19 +131,23 @@ def music_handler_volume_down(hermes,intentMessage):
 			print sys.exc_info()
 
 def music_handler_next(hermes,intentMessge):
+	hermes.publish_end_session(intentMessage.session_id, "")
 	for zone in zones:
 		try:
-			zone.next()
+			if (zone.is_coordinator):
+				zone.next()
 		except:
 			print sys.exc_info()
 
 def music_handler_radio(hermes,intentMessage):
+	hermes.publish_end_session(intentMessage.session_id, "")
 	try:
 		sonos.turn_on_radio("arnaud #4")
 	except:
 		print sys.exc_info()
 
 if __name__ == "__main__":
+	print "started SONOS snips handler"
 	with Hermes("localhost:1883") as h:
 		h.subscribe_intent("arnadu:resumeMusic",music_handler_resume) \
 		.subscribe_intent("arnadu:speakerInterrupt",music_handler_pause) \
